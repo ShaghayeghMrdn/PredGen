@@ -1,0 +1,2 @@
+item: (String, Int, Int, Boolean) = (D2 E2,1200,35,true)
+res0: Boolean = false
