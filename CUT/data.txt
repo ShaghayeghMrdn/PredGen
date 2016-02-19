@@ -1,0 +1,6 @@
+D1 E1; 900; 35; true
+D2 E2; 400; 36; true
+D3 E3; 350; 25; false
+D4 E4; 450; 47; true
+D5 E5; 1500; 41; true
+D6 E6; 1800; 32; true

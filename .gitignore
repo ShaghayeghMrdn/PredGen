@@ -1,5 +1,5 @@
 *.DS_Store
 temp/*
-*lib/spark-*
+*/lib/spark-*
 */target/*
 */project/*
