@@ -127,9 +127,12 @@ object PredicateGen {
 			}
 
 			candidatesPerformance = candidatesPerformance.sortWith((A, B) => A._2 > B._2) //Descending sort
+			var index = 0
+			if(candidatesPerformance(0)._1.isEmpty())
+				index += 1
 
-			if(candidatesPerformance.size > 0 && candidatesPerformance(0)._2 > performanceMap(bestHypothesis))
-				bestHypothesis = candidatesPerformance(0)._1
+			if(candidatesPerformance.size > 0 && candidatesPerformance(index)._2 > performanceMap(bestHypothesis))
+				bestHypothesis = candidatesPerformance(index)._1
 
 			println("best hypothesis: "+bestHypothesis.toString())
 
@@ -140,12 +143,12 @@ object PredicateGen {
 			println("K best candidates:")
 			candidateHs.foreach(ch => println(ch.toString()))
 			i = i + 1
-			if(i == 3) 
+			if(i == 1) 
 				candidateHs.clear() //!!!!!!!!!!!!!!!!!!
 	
 		}
 
-		val (matchedIndices, outputs) = runInput(bestHypothesis, indices, 23)
+		val (matchedIndices, outputs) = runInput(bestHypothesis, indices, 17)
 		println(matchedIndices.mkString(" "))
 		matchedIndices.foreach(m => indices -= m)
 		println("updated indices: "+indices.mkString(" "))
@@ -164,13 +167,12 @@ object PredicateGen {
 	}
 
 	def performance(h: Hypothesis, indices: ArrayBuffer[Integer]): Double = {
-		val lineNumber = 23
+		val lineNumber = 17
 		val (matchedIndices, outputs) = runInput(h, indices, lineNumber)
 		val e = entropy(outputs)
 		println(h+" : "+e)
 		println("-----------------------------")
 		return e
-		//return rand.nextDouble
 	}
 
 	def log2(x: Double): Double = {
@@ -201,7 +203,7 @@ object PredicateGen {
 	}
 
 	def prepareForNext(examples: ArrayBuffer[String], indices: ArrayBuffer[Integer]) {
-		val writer = new PrintWriter("../temp/data", "UTF-8")
+		val writer = new PrintWriter("../temp/data.txt", "UTF-8")
 		indices.foreach(i => writer.println(examples(i)))
 		writer.close()
 	}

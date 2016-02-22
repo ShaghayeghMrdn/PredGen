@@ -64,6 +64,10 @@ object Rules {
 			case that: Hypothesis => this.toString().equals(that.toString())
 			case _ => false
 		}
+
+		def isEmpty(): Boolean = {
+			return (clauses.size == 0)
+		}
 	}
 
 	class Rule(bestH: Hypothesis, predictedVal: Boolean) {
