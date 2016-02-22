@@ -1,7 +1,7 @@
 package learningrule
 
-import org.apache.spark.lineage.LineageContext
 import org.apache.spark.{SparkContext, SparkConf}
+import org.apache.spark.rdd._
 
 import scalax.file.Path
 import java.io._
@@ -41,12 +41,12 @@ object PredicateGen {
 		for(a <- attributes)
 			println(a.toString())
 
-		val examples = ArrayBuffer[String]()
-		val inputData = Source.fromFile("../CUT/data.txt")
-		val examplesIt = try inputData.getLines
-		examplesIt.copyToBuffer(examples)
-		inputData.close()
-		val rules = sequentialCovering(attributes, examples)
+		// val examples = ArrayBuffer[String]()
+		// val inputData = Source.fromFile("../CUT/data.txt")
+		// val examplesIt = try inputData.getLines
+		// examplesIt.copyToBuffer(examples)
+		// inputData.close()
+		val rules = sequentialCovering(attributes/*, examples*/)
 		println("Learned Rules:")
 		println(rules.toString())
 	} 
@@ -78,31 +78,42 @@ object PredicateGen {
 		}
 	}
 
-	def sequentialCovering(attrs:ArrayBuffer[Constraint], examples:ArrayBuffer[String]): LearnedRules = {
+	def sequentialCovering(attrs:ArrayBuffer[Constraint]/*, examples:ArrayBuffer[String]*/): LearnedRules = {
 		val rules: LearnedRules = new LearnedRules()
 		var newRule: Rule = null
 		var allConstraints = generateAllConstraints(attrs)
-
-		var indices = new ArrayBuffer[Integer]()
-		for(i <- 0 until examples.size)
-			indices += i
+		var i = 0
+		// var indices = new ArrayBuffer[Integer]()
+		// for(i <- 0 until examples.size)
+		// 	indices += i
 		
 		do {
-			prepareForNext(examples, indices)
-			println("here!")
-			newRule = learnOneRule(allConstraints, indices, 2)
+			// prepareForNext(examples, indices)
+			newRule = learnOneRule(allConstraints,/* indices,*/ 2)
 			rules.addRule(newRule)
-		} while(indices.size != 0)
+			i += 1
+		} while(i < 2)
 
 		return rules
 	}
 
+	def initiateSpark(): SparkContext = {
+		val conf = new SparkConf()
+
+        conf.setMaster("local[1]")
+        conf.setAppName("EvaluatePerformance")
+
+        return new SparkContext(conf)	
+	}
+
 	def learnOneRule(allConstraints:ArrayBuffer[Constraint], indices: ArrayBuffer[Integer], k:Int): Rule = {
+		val sc = initiateSpark()
+        //------------------------------
 		var candidateHs: ArrayBuffer[Hypothesis] = new ArrayBuffer()
 		var bestHypothesis: Hypothesis = new Hypothesis()
 		var performanceMap = Map[Hypothesis, Double]()
 		var i = 0
-		performanceMap(bestHypothesis) = performance(bestHypothesis, indices) //h = true
+		performanceMap(bestHypothesis) = 0.3 //performance(sc, bestHypothesis) //h = true
 		candidateHs += bestHypothesis
 
 		var newCandidateHypotheses: ArrayBuffer[Hypothesis] = new ArrayBuffer()
@@ -124,7 +135,7 @@ object PredicateGen {
 
 			var candidatesPerformance: ArrayBuffer[Tuple2[Hypothesis, Double]] = new ArrayBuffer()
 			for(newH <- newCandidateHypotheses){
-				val newPerformance = performance(newH, indices)
+				val newPerformance = performance(sc, newH)
 				candidatesPerformance += new Tuple2(newH, newPerformance)
 				performanceMap(newH) = newPerformance
 			}
@@ -148,18 +159,21 @@ object PredicateGen {
 			i = i + 1
 			if(i == 2) 
 				candidateHs.clear() //!!!!!!!!!!!!!!!!!!
-	
 		}
 
-		val (matchedIndices, outputs) = runInput(bestHypothesis, indices, 17)
-		println(matchedIndices.mkString(" "))
-		matchedIndices.foreach(m => indices -= m)
-		println("updated indices: "+indices.mkString(" "))
+		println("-------------------------------->"+bestHypothesis)
+		sc.stop()
+
+//TODO: calculate prediction
+		// val (matchedIndices, outputs) = runInput(bestHypothesis, indices, 17)
+		// println(matchedIndices.mkString(" "))
+		// matchedIndices.foreach(m => indices -= m)
+		// println("updated indices: "+indices.mkString(" "))
 		var perdiction = true
-		var countTrue = 0
-		outputs.foreach(o => if(o) countTrue += 1)
-		if(countTrue < outputs.size/2)
-			perdiction = false
+		// var countTrue = 0
+		// outputs.foreach(o => if(o) countTrue += 1)
+		// if(countTrue < outputs.size/2)
+		// 	perdiction = false
 		return new Rule(bestHypothesis, perdiction)
 	}
 
@@ -169,13 +183,52 @@ object PredicateGen {
 		return result
 	}
 
-	def performance(h: Hypothesis, indices: ArrayBuffer[Integer]): Double = {
+	def performance(sc: SparkContext, h: Hypothesis): Double = {
 		val lineNumber = 17
-		val (matchedIndices, outputs) = runInput(h, indices, lineNumber)
-		val e = entropy(outputs)
-		println(h+" : "+e)
+		//val (matchedIndices, outputs) = runInput(h, indices, lineNumber)
+		val settings = new Settings(str => println("Error: "+str))
+		settings.usejavacp.value = true
+		var interpreter = new IMain(settings)
+		// new PrintWriter(new File("result.txt")
+		//---------------spark--------------
+        val text = sc.textFile("input.txt", 1)
+        val rdds = text.flatMap(line => line.split("\n")).map(line => {val index = new StringOps(line).lastIndexOf(' '); val splitted = line.splitAt(index); (splitted._1, splitted._2.substring(1).toBoolean)})
+		println(rdds.collect().mkString("\n"))
+		val broadcastVar = sc.broadcast(interpreter)
+        val startOfStr = "val item = "
+        val endOfStr = "; "+h
+		val joinedData = rdds.watchpoint(cls.function).map(pair => {
+										val matched = interpret(interpreter, startOfStr+pair._1+endOfStr)
+										(pair._1, pair._2, matched)})
+		println(joinedData.collect().mkString("\n"))
+
+		// val e = entropy(outputs)
+		// println(h+" : "+e)
 		println("-----------------------------")
 		return e
+	}
+
+	def interpret(interpreter: IMain, code: String): Boolean = {
+		val result = interpreter.interpret(code)
+		if(result != IR.Success)
+			throw new FailedEvaluatingPredicate()
+		val eval = evaluate()
+		//interpreter.close()
+		return eval
+	}
+
+	def evaluate(): Boolean = {
+		val pattern = """item:.*= (.*)\nres(\d+): Boolean = (true|false).*""".r
+		val source = Source.fromFile("result.txt")
+		val lines = try source.mkString finally source.close()
+		//val matchedInputs = ArrayBuffer[String]()
+		lines match {
+			case pattern(value, id, matched) => {println(value+" "+matched)
+												 //if(matched.toBoolean) matchedInputs += value
+												 return matched.toBoolean}
+			case _ => throw new FailedEvaluatingPredicate("Failed matching the output written in file!")
+		}
+
 	}
 
 	def log2(x: Double): Double = {
@@ -205,58 +258,11 @@ object PredicateGen {
 		return entropy
 	}
 
-	def prepareForNext(examples: ArrayBuffer[String], indices: ArrayBuffer[Integer]) {
-		val writer = new PrintWriter("../temp/data.txt", "UTF-8")
-		indices.foreach(i => writer.println(examples(i)))
-		writer.close()
-	}
-
 	def evaluatePredicates(h: Hypothesis, examples:ArrayBuffer[String], indices: ArrayBuffer[Integer]) = {
 		val hInterpreter = new HInterpreter()
 		val matchedIndices = new ArrayBuffer[Integer]()
 		indices.foreach(i => {
 			val matched = hInterpreter.interpret("val item = "+examples(i)+"; "+h)	
 			})
-		
 	}
-
-	def runInput(h: Hypothesis, indices: ArrayBuffer[Integer], lineNumber: Integer): Tuple2[ArrayBuffer[Integer], ArrayBuffer[Boolean]] = {
-		val dstStr = "../temp/src/main/scala/input.scala"
-		val src: Path = Path.fromString(SRC_PATH)
-		val dst: Path = Path.fromString(dstStr)
-		src.copyTo(target=dst, copyAttributes=false, replaceExisting=true)
-
-		val line = "print(\"\\n>>>>>>>\"+("+h.toString()+").toString());"
-		val toBeAdded = new ArrayBuffer[String]()
-		toBeAdded += line
-
-		val code = Source.fromFile(dstStr).getLines.toBuffer
-		code.insertAll(lineNumber, toBeAdded)
-		new PrintWriter(dstStr){write(code.mkString("\n")); close}
-
-		var outputs = new ArrayBuffer[Boolean]()
-		var matchedIndices = new ArrayBuffer[Integer]() 
-
-		var outputStream = Shell("cd ../temp/ && sbt run")
-		var i = 0
-		//println(outputStream)
-		val pattern = """>>>>>>>(true|false)-->(true|false).*""".r
-		for(line <- outputStream) {
-			line match {
-				case pattern(matched, success) => { //assuming data order has not changed
-					if(matched.toBoolean){
-						matchedIndices += indices(i)
-						outputs += success.toBoolean
-					}
-					i += 1
-				}
-				case _ => ;
-			}
-		}
-		println(h+" --> "+outputs.mkString(" ")+" "+outputs.size)
-		return (matchedIndices, outputs)
-	}
-
-
-
 }
