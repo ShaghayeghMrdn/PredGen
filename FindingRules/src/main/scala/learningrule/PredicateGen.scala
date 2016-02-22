@@ -89,6 +89,7 @@ object PredicateGen {
 		
 		do {
 			prepareForNext(examples, indices)
+			println("here!")
 			newRule = learnOneRule(allConstraints, indices, 2)
 			rules.addRule(newRule)
 		} while(indices.size != 0)
@@ -119,6 +120,8 @@ object PredicateGen {
 				}	
 			}
 
+			println(newCandidateHypotheses.size) 
+
 			var candidatesPerformance: ArrayBuffer[Tuple2[Hypothesis, Double]] = new ArrayBuffer()
 			for(newH <- newCandidateHypotheses){
 				val newPerformance = performance(newH, indices)
@@ -143,7 +146,7 @@ object PredicateGen {
 			println("K best candidates:")
 			candidateHs.foreach(ch => println(ch.toString()))
 			i = i + 1
-			if(i == 1) 
+			if(i == 2) 
 				candidateHs.clear() //!!!!!!!!!!!!!!!!!!
 	
 		}
