@@ -29,28 +29,8 @@ import org.apache.spark.lineage.LineageContext._
 import org.apache.spark.SparkContext._
 import scala.sys.process._
 
-class Review() {
-    var rater_id: Int = 0
-    var rating: Byte = 0
-}
-
-class Cluster() {
-    var movie_id : Long = 0
-    var similarity: Float = 0.0f
-    var total: Short = 0
-    var reviews = new ListBuffer[Review]()
-
-    def this(other: Cluster) {
-        this()
-        this.movie_id = other.movie_id
-        this.similarity = other.similarity
-        this.total = other.total
-        this.reviews = other.reviews
-    }
-}
-
 object Classification {
-    private val strModelFile = "ratings_init"
+    private val strModelFile = "initial_centroids"
     private val maxClusters = 16
     private val centroids = new Array[Cluster](maxClusters)
     private val centroids_ref = new Array[Cluster](maxClusters)
@@ -62,9 +42,8 @@ object Classification {
             centroids_ref(i) = new Cluster()
         }
         val modelFile = new File(strModelFile)
-        val opnScanner = new Scanner(modelFile).useDelimiter("\\s*:\\s*|\\s*,\\s*|\\s*_\\s*")
+        val opnScanner = new Scanner(modelFile)
         while (opnScanner.hasNext) {
-            println("Here")
             val k = opnScanner.nextInt()
             centroids_ref(k).similarity = opnScanner.nextFloat()
             centroids_ref(k).movie_id = opnScanner.nextLong()
@@ -144,7 +123,7 @@ object Classification {
             //set up spark configuration
             val sparkConf = new SparkConf().setMaster("local[8]")
             sparkConf.setAppName("Classification_LineageDD")
-                .set("spark.executor.memory", "2g")
+                .set("spark.executor.memory", "3g")
 
             //set up lineage
             var lineage = true
@@ -182,7 +161,7 @@ object Classification {
             logger.log(Level.INFO, "Record Lineage time starts at " + LineageStartTimestamp)
 
             //run spark with lineage
-            val lines = lc.textFile("ratings_rest", 1)
+            val lines = lc.textFile("ratings", 1)
             val classification_result = lines
                 //make sure that all records are in the right format
                 .filter(line => {
