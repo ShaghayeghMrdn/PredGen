@@ -71,7 +71,7 @@ object SelfJoin {
       logger.log(Level.INFO, "Record Lineage time starts at " + LineageStartTimestamp)
 
       //spark program starts here
-      val lines = lc.textFile("file1s", 10)
+      val lines = lc.textFile("smaller", 10)
       logger.log(Level.INFO, "Total data count is " + lines.count)
       val selfjoin_result = lines.filter(s => {
           var index: Int = 0
