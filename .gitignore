@@ -3,3 +3,4 @@ temp/*
 */lib/spark-*
 */target/*
 */project/*
+*myLog*
