@@ -78,35 +78,6 @@ object Classification {
         numClust
     }
 
-    //  def main(args:Array[String]): Unit = {
-    //    val pw = new PrintWriter(new File("/Users/Michael/IdeaProjects/Classification_LineageDD/lineageResult"))
-    //
-    //    val sparkConf = new SparkConf().setMaster("local[8]")
-    //    sparkConf.setAppName("Classification_LineageDD-" )
-    //      .set("spark.executor.memory", "2g")
-    //
-    //    val ctx = new SparkContext(sparkConf)
-    //
-    //    val lines = ctx.textFile("/Users/Michael/IdeaProjects/Classification/file1_dbug", 1)
-    //    val totalClusters = initializeCentroids()
-    //    val constr = new sparkOperations
-    //    val output = constr.sparkWorks(lines, maxClusters, totalClusters, centroids_ref).collect
-    //    val itr = output.iterator
-    //    while (itr.hasNext) {
-    //      val tupVal = itr.next()
-    ////      pw.append(tupVal._1 + " " + tupVal._2 + "\n")
-    //      pw.append(tupVal._1 + ":")
-    //      val itr2 = tupVal._2.toIterator
-    //      while (itr2.hasNext) {
-    //        val itrVal = itr2.next()
-    //        pw.append(itrVal + "\n")
-    //      }
-    //
-    //    }
-    //    pw.close()
-    //    ctx.stop()
-    //  }
-
     private val exhaustive = 0
 
     def main(args: Array[String]): Unit = {
@@ -247,6 +218,7 @@ object Classification {
                 })
                 //the final result format will be key: clusterId, value:<movie_id1>,<movie_id2>,<movie_id3>,<movie_id4>,...
                 .reduceByKey(_ + "," + _)
+                //.watchpoint(bucket => bucket._2.split(",").size < 60)
                 //this final stage throws an exception
                 .map(s => {
                     val bList = s._2.split(",")
@@ -306,7 +278,6 @@ object Classification {
             logger.log(Level.INFO, "Lineage takes " + (lineageEndTime - LineageStartTime) / 1000 + " microseconds")
             logger.log(Level.INFO, "Lineage ends at " + lineageEndTimestamp)
 
-            //      linRdd.show.collect.foreach(println)
             linRdd.show.collect().foreach(s => {
                 pw.append(s.toString)
                 pw.append('\n')

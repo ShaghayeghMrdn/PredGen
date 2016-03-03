@@ -15,7 +15,7 @@ object ConstraintObj {
         def negation: Operator
     }
 
-    case class LessThan() extends Operator {
+    case class LessThan extends Operator {
         override def toString: String = { return "<" }
         def negation: Operator = { return new GreaterThanOrEq() }
     }
@@ -48,11 +48,17 @@ object ConstraintObj {
         override def toString: String = { return value }
     }
 
-    class Constraint(op1: Operand = null, opr: Operator = null, op2: Operand = null) {
+    abstract class Predicate {
+        var first: Operand
+        var op: Operator
+        var second: Operand
+    }
+
+    case class Constraint(op1: Operand, opr: Operator, op2: Operand) extends Predicate {
         //println(showRaw(expr))
-        var first: Operand = op1
-        var op: Operator = opr
-        var second: Operand = op2
+        first = op1
+        op = opr
+        second = op2
 
         def constructFromTree(expr: Tree): Unit = {
             var tokens = expr match {
